@@ -8,7 +8,7 @@ import { IsEnteredAtom } from "../stores";
 
 import { Dancer } from "./Dancer";
 import { Loader } from "./Loader";
-import { MovingDom } from "./dom/MovingDom";
+import { MovingDOM } from "./dom/MovingDom";
 
 export const MainCanvas = () => {
   const isEntered = useRecoilValue(IsEnteredAtom);
@@ -30,7 +30,7 @@ export const MainCanvas = () => {
     >
       <ScrollControls pages={isEntered ? 8 : 0} damping={0.25}>
         <Suspense fallback={<Loader />}>
-          <MovingDom />
+          <MovingDOM />
           <Dancer />
         </Suspense>
       </ScrollControls>

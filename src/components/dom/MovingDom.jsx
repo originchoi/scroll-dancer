@@ -5,8 +5,9 @@ import { useRecoilValue } from "recoil";
 import { IsEnteredAtom } from "../../stores";
 import styled from "styled-components";
 
-export const MovingDom = () => {
+export const MovingDOM = () => {
   const isEntered = useRecoilValue(IsEnteredAtom);
+  const fixed = document.getElementById("fixed");
   const scorll = useScroll();
   const article01Ref = useRef(null);
   const article02Ref = useRef(null);
@@ -17,6 +18,7 @@ export const MovingDom = () => {
   useFrame(() => {
     if (
       !isEntered ||
+      !fixed ||
       !article01Ref.current ||
       !article02Ref.current ||
       !article03Ref.current ||
@@ -27,8 +29,16 @@ export const MovingDom = () => {
 
     article01Ref.current.style.opacity = `${1 - scorll.range(0, 1 / 8)}`;
     article02Ref.current.style.opacity = `${1 - scorll.range(1 / 8, 1 / 8)}`;
-    article03Ref.current.style.opacity = `${1 - scorll.range(2 / 8, 1 / 8)}`;
-    article04Ref.current.style.opacity = `${scorll.range(3 / 8, 1 / 8)}`;
+    article03Ref.current.style.opacity = `${scorll.curve(2 / 8, 1 / 8)}`;
+    article04Ref.current.style.opacity = `${scorll.curve(3 / 8, 1 / 8)}`;
+
+    if (scorll.visible(4 / 8, 3 / 8)) {
+      fixed.style.display = "flex";
+      fixed.style.opacity = `${scorll.curve(4 / 8, 3 / 8)}`;
+    } else {
+      fixed.style.display = "none";
+    }
+
     article08Ref.current.style.opacity = `${scorll.range(7 / 8, 1 / 8)}`;
   });
 

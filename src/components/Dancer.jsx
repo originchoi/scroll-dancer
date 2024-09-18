@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Box,
   Circle,
@@ -17,15 +17,28 @@ import { IsEnteredAtom } from "../stores";
 import { Loader } from "./Loader";
 
 let timeline;
+const colors = {
+  boxMaterialColor: "#DC4F00",
+};
 
 export const Dancer = () => {
   const three = useThree();
   const isEntered = useRecoilValue(IsEnteredAtom);
   const dancerRef = useRef(null);
+  const boxRef = useRef(null);
+  const starGroupRef01 = useRef(null);
+  const starGroupRef02 = useRef(null);
+  const starGroupRef03 = useRef(null);
+  const rectAreaLightRef = useRef(null);
+  const hemisphereLightRef = useRef(null);
+
   const { scene, animations } = useGLTF("/models/dancer.glb");
   const texture = useTexture("/textures/5.png");
 
   const { actions } = useAnimations(animations, dancerRef);
+
+  const [currentAnimation, setCurrentAnimation] = useState("wave");
+  const [rotateFinished, setRotateFinished] = useState(false);
 
   const { positions } = useMemo(() => {
     const count = 500;
@@ -44,13 +57,53 @@ export const Dancer = () => {
     if (!isEntered) return;
 
     timeline.seek(scroll.offset * timeline.duration());
+    boxRef.current.material.color = new THREE.Color(colors.boxMaterialColor);
+
+    if (rotateFinished) {
+      setCurrentAnimation("breakdancingEnd");
+    } else {
+      setCurrentAnimation("wave");
+    }
   });
 
   useEffect(() => {
     if (!isEntered) return;
 
+    three.camera.lookAt(1, 2, 0);
     actions["wave"].play();
-  }, [actions, isEntered]);
+    three.scene.background = new THREE.Color(colors.boxMaterialColor);
+    scene.traverse((obj) => {
+      if (obj.isMesh) {
+        obj.castShadow = true;
+        obj.receiveShadow = true;
+      }
+    });
+  }, [actions, isEntered, scene, three.camera, three.scene]);
+
+  useEffect(() => {
+    let timeout;
+
+    if (currentAnimation === "wave") {
+      actions[currentAnimation]?.reset().fadeIn(0.5).play();
+    } else {
+      actions[currentAnimation]
+        ?.reset()
+        .fadeIn(0.5)
+        .play()
+        .setLoop(THREE.LoopOnce, 1);
+
+      timeout = setTimeout(() => {
+        if (actions[currentAnimation]) {
+          actions[currentAnimation].paused = true;
+        }
+      }, 8000);
+    }
+
+    return () => {
+      clearTimeout(timeout);
+      actions[currentAnimation].reset().fadeOut(0.5).stop();
+    };
+  }, [actions, currentAnimation, scroll.offset]);
 
   useEffect(() => {
     if (!isEntered) return;
@@ -79,11 +132,47 @@ export const Dancer = () => {
         z: 0,
       }
     );
+
+    gsap.fromTo(
+      colors,
+      { boxMaterialColor: "#0C0400" },
+      { duration: 2.5, boxMaterialColor: "#DC4F00" }
+    );
+
+    gsap.to(starGroupRef01.current, {
+      yoyo: true,
+      duration: 2,
+      repeat: -1,
+      ease: "linear",
+      size: 0.05,
+    });
+
+    gsap.to(starGroupRef02.current, {
+      yoyo: true,
+      duration: 3,
+      repeat: -1,
+      ease: "linear",
+      size: 0.05,
+    });
+
+    gsap.to(starGroupRef03.current, {
+      yoyo: true,
+      duration: 4,
+      repeat: -1,
+      ease: "linear",
+      size: 0.05,
+    });
   }, [isEntered, three.camera.position, three.camera.rotation]);
 
   useEffect(() => {
     if (!isEntered) return;
     if (!dancerRef.current) return;
+
+    const pivot = new THREE.Group();
+
+    pivot.position.copy(dancerRef.current.position);
+    pivot.add(three.camera);
+    three.scene.add(pivot);
 
     timeline = gsap.timeline();
     timeline
@@ -112,6 +201,27 @@ export const Dancer = () => {
         },
         "<"
       )
+      .to(
+        colors,
+        {
+          duration: 10,
+          boxMaterialColor: "#0C0400",
+        },
+        "<"
+      )
+      .to(pivot.rotation, {
+        duration: 10,
+        y: Math.PI,
+      })
+      .to(
+        three.camera.position,
+        {
+          duration: 10,
+          x: -4,
+          z: 12,
+        },
+        "<"
+      )
       .to(three.camera.position, {
         duration: 10,
         x: 0,
@@ -121,15 +231,45 @@ export const Dancer = () => {
         duration: 10,
         x: 0,
         z: 16,
+        onUpdate: () => {
+          setRotateFinished(false);
+        },
+      })
+      .to(hemisphereLightRef.current, {
+        duration: 5,
+        intensity: 30,
+      })
+      .to(
+        pivot.rotation,
+        {
+          duration: 15,
+          y: Math.PI * 4,
+          onUpdate: () => {
+            setRotateFinished(true);
+          },
+        },
+        "<"
+      )
+      .to(colors, {
+        duration: 15,
+        boxMaterialColor: "#DC4F00",
       });
-  }, [isEntered, three.camera.position]);
+
+    return () => {
+      three.scene.remove(pivot);
+    };
+  }, [isEntered, three.camera.position, three.camera.rotation]);
 
   if (isEntered) {
     return (
       <>
         <primitive ref={dancerRef} object={scene} scale={0.05} />;
         <ambientLight intensity={2} />
-        <rectAreaLight position={[0, 10, 0]} intensity={30} />
+        <rectAreaLight
+          ref={rectAreaLightRef}
+          position={[0, 10, 0]}
+          intensity={30}
+        />
         <pointLight
           position={[0, 5, 0]}
           intensity={45}
@@ -137,13 +277,14 @@ export const Dancer = () => {
           receiveShadow
         />
         <hemisphereLight
+          ref={hemisphereLightRef}
           position={[0, 5, 0]}
           intensity={0}
           groundColor={"lime"}
           color="blue"
         />
         0
-        <Box position={[0, 0, 0]} args={[100, 100, 100]}>
+        <Box ref={boxRef} position={[0, 0, 0]} args={[100, 100, 100]}>
           <meshStandardMaterial color={"#DC4F00"} side={THREE.DoubleSide} />
         </Box>
         <Circle
@@ -157,6 +298,7 @@ export const Dancer = () => {
         </Circle>
         <Points positions={positions.slice(0, positions.length / 3)}>
           <pointsMaterial
+            ref={starGroupRef01}
             size={0.5}
             color={new THREE.Color("#DC4F00")}
             sizeAttenuation
@@ -173,6 +315,7 @@ export const Dancer = () => {
           )}
         >
           <pointsMaterial
+            ref={starGroupRef02}
             size={0.5}
             color={new THREE.Color("#DC4F00")}
             sizeAttenuation
@@ -184,6 +327,7 @@ export const Dancer = () => {
         </Points>
         <Points positions={positions.slice((positions.length * 2) / 3)}>
           <pointsMaterial
+            ref={starGroupRef03}
             size={0.5}
             color={new THREE.Color("#DC4F00")}
             sizeAttenuation

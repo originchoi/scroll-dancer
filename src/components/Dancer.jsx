@@ -180,7 +180,7 @@ export const Dancer = () => {
         dancerRef.current.rotation,
         {
           duration: 4,
-          y: -4 * Math.PI,
+          y: Math.PI,
         },
         0.5
       )
